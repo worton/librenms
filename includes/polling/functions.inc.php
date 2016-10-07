@@ -134,7 +134,12 @@ function poll_sensor($device, $class, $unit)
         }
 
         if ($sensor['sensor_class'] == 'state' && $sensor['sensor_current'] != $sensor_value) {
-            log_event($class . ' sensor has changed from ' . $sensor['sensor_current'] . ' to ' . $sensor_value, $device, $class, $sensor['sensor_id']);
+            if (($sensor['sensor_type'] == 'jnxYellowAlarmState' || $sensor['sensor_type'] == 'jnxRedAlarmState') &&
+                ($sensor_value == 0 || $sensor['sensor_current'] == 0)) {
+                //nooothing
+            } else {
+                log_event($class . ' sensor changed from ' . $sensor['sensor_current'] . ' to ' . $sensor_value, $device, $class, $sensor['sensor_id']);
+            }
         }
 
         dbUpdate(array('sensor_current' => $sensor_value, 'sensor_prev' => $sensor['sensor_current'], 'lastupdate' => array('NOW()')), 'sensors', '`sensor_class` = ? AND `sensor_id` = ?', array($class,$sensor['sensor_id']));
