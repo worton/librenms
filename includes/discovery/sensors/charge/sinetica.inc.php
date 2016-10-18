@@ -1,6 +1,6 @@
 <?php
 /**
- * CommonFunctionsTest.php
+ * sinecta.php
  *
  * -Description-
  *
@@ -23,25 +23,33 @@
  * @author     Tony Murray <murraytony@gmail.com>
  */
 
-namespace LibreNMS\Tests;
+if ($device['os'] == 'sinetica') {
+    $charge_oid = '.1.3.6.1.4.1.13891.101.2.4.0';
+    $charge = snmp_get($device, $charge_oid, '-Osqnv');
 
-include 'includes/discovery/vlans/vlan_functions.inc.php';
+    if (!empty($charge)) {
+        $type = 'sinetica';
+        $index = 0;
+        $limit = 100;
+        $lowlimit = 0;
+        $lowwarnlimit = 10;
+        $descr = 'Battery Charge';
 
-class VlanFunctionsTest extends \PHPUnit_Framework_TestCase
-{
-    public function testQBridgeBits2Indices()
-    {
-        $bits = "8040 201008040201 ff000000   000000";
-        $indices = array(1, 10, 19, 28, 37, 46, 55, 64, 65, 66, 67, 68, 69, 70, 71, 72);
-
-        $this->assertTrue(q_bridge_bits2indices($bits) == $indices);
-    }
-    public function testHex2Bin()
-    {
-        $hexstr = "54686973206973206f6e6c79206120746573742e00ff";
-        $binstr = "This is only a test.\x00\xff";
-
-        $this->assertTrue(hex2bin($hexstr) === $binstr);
-        $this->assertTrue(hex2bin_compat($hexstr) === $binstr);
+        discover_sensor(
+            $valid['sensor'],
+            'charge',
+            $device,
+            $charge_oid,
+            $index,
+            $type,
+            $descr,
+            1,
+            1,
+            $lowlimit,
+            $lowwarnlimit,
+            null,
+            $limit,
+            $charge
+        );
     }
 }

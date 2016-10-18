@@ -164,7 +164,9 @@ function poll_device($device, $options)
     unset($array);
     $device_start = microtime(true);
     // Start counting device poll time
-    echo $device['hostname'].' '.$device['device_id'].' '.$device['os'].' ';
+    echo 'Hostname: ' . $device['hostname'] . PHP_EOL;
+    echo 'Device ID: ' . $device['device_id'] . PHP_EOL;
+    echo 'OS: ' . $device['os'];
     $ip = dnslookup($device);
 
     if (!empty($ip) && $ip != inet6_ntop($device['ip'])) {
@@ -175,10 +177,10 @@ function poll_device($device, $options)
 
     if ($config['os'][$device['os']]['group']) {
         $device['os_group'] = $config['os'][$device['os']]['group'];
-        echo '('.$device['os_group'].')';
+        echo ' ('.$device['os_group'].')';
     }
 
-    echo "\n";
+    echo PHP_EOL.PHP_EOL;
 
     unset($poll_update);
     unset($poll_update_query);
@@ -187,7 +189,7 @@ function poll_device($device, $options)
     $update_array = array();
 
     $host_rrd = $config['rrd_dir'].'/'.$device['hostname'];
-    if (!is_dir($host_rrd)) {
+    if ($config['norrd'] !== true && !is_dir($host_rrd)) {
         mkdir($host_rrd);
         echo "Created directory : $host_rrd\n";
     }

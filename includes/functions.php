@@ -1118,18 +1118,28 @@ function guidv4($data)
     return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
 }
 
-function set_curl_proxy($post)
+/**
+ * @param $curl
+ */
+function set_curl_proxy($curl)
 {
     global $config;
-    if (isset($_ENV['https_proxy'])) {
-        $tmp = rtrim($_ENV['https_proxy'], "/");
-        $proxystr = str_replace(array("http://", "https://"), "", $tmp);
-        $config['callback_proxy'] = $proxystr;
-        echo "Setting proxy to ".$proxystr." (from https_proxy=".$_ENV['https_proxy'].")\n";
+
+    $proxy = '';
+    if (getenv('http_proxy')) {
+        $proxy = getenv('http_proxy');
+    } elseif (getenv('https_proxy')) {
+        $proxy = getenv('https_proxy');
+    } elseif (isset($config['callback_proxy'])) {
+        $proxy = $config['callback_proxy'];
+    } elseif (isset($config['http_proxy'])) {
+        $proxy = $config['http_proxy'];
     }
-    if (isset($config['callback_proxy'])) {
-        echo "Using ".$config['callback_proxy']." as proxy\n";
-        curl_setopt($post, CURLOPT_PROXY, $config['callback_proxy']);
+
+    $tmp = rtrim($proxy, "/");
+    $proxy = str_replace(array("http://", "https://"), "", $tmp);
+    if (!empty($proxy)) {
+        curl_setopt($curl, CURLOPT_PROXY, $proxy);
     }
 }
 
@@ -1684,4 +1694,45 @@ function q_bridge_bits2indices($hex_data)
         }
     }
     return $indices;
+}
+
+/**
+ * @param array $device
+ * @param int|string $raw_value The value returned from snmp
+ * @param int $capacity the normalized capacity
+ * @return int the toner level as a percentage
+ */
+function get_toner_levels($device, $raw_value, $capacity)
+{
+    // -3 means some toner is left
+    if ($raw_value == '-3') {
+        return 50;
+    }
+
+    // -2 means unknown, -1 mean no restrictions
+    if ($raw_value == '-2' || $raw_value == '-1') {
+        return 0;  // FIXME: is 0 what we should return?
+    }
+
+    // Non-standard snmp values
+    if ($device['os'] == 'ricoh' || $device['os'] == 'nrg' || $device['os'] == 'lanier') {
+        if ($raw_value == '-100') {
+            return 0;
+        }
+    } elseif ($device['os'] == 'brother') {
+        if (!str_contains($device['hardware'], 'MFC-L8850')) {
+            switch ($raw_value) {
+                case '0':
+                    return 100;
+                case '1':
+                    return 5;
+                case '2':
+                    return 0;
+                case '3':
+                    return 1;
+            }
+        }
+    }
+
+    return round($raw_value / $capacity * 100);
 }
