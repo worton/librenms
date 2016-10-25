@@ -124,7 +124,8 @@ $ifmib_oids = array(
 
 echo 'Caching Oids: ';
 
-if ($device['os'] === 'f5' && (version_compare($device['version'], '11.2.0', '>=') && version_compare($device['version'], '11.7', '<'))) {
+// Disable this check -- for VCMP guests that I use, even in the versions matched, we want the old behavior
+if (0 && $device['os'] === 'f5' && (version_compare($device['version'], '11.2.0', '>=') && version_compare($device['version'], '11.7', '<'))) {
     require_once 'ports/f5.inc.php';
 } else {
     if (!in_array($device['hardware'], $config['os'][$device['os']]['bad_ifXEntry'])) {
