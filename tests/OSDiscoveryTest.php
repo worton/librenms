@@ -386,6 +386,11 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
         $this->checkOS('deliberant');
     }
 
+    public function testDellrcs()
+    {
+        $this->checkOS('dell-rcs');
+    }
+
     public function testDelllaser()
     {
         $this->checkOS('dell-laser');
@@ -466,6 +471,7 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
     {
         $this->checkOS('edgeos');
         $this->checkOS('edgeos', 'edgeos-erl');
+        $this->checkOS('edgeos', 'edgeos-er');
     }
 
     public function testEdgeswitch()
@@ -547,6 +553,11 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
         $this->checkOS('fortios');
     }
 
+    public function testFortiswitch()
+    {
+        $this->checkOS('fortiswitch');
+    }
+
     public function testFoundryos()
     {
         $this->checkOS('foundryos');
@@ -565,6 +576,7 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
     public function testFujitsupyos()
     {
         $this->checkOS('fujitsupyos');
+        $this->checkOS('fujitsupyos', 'fujitsupyos-10gbe');
     }
 
     public function testFxos()
@@ -1091,6 +1103,7 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
         $this->checkOS('quanta', 'quanta1');
         $this->checkOS('quanta', 'quanta2');
         $this->checkOS('quanta', 'quanta3');
+        $this->checkOS('quanta', 'quanta-lb9');
     }
 
     public function testRadlan()
