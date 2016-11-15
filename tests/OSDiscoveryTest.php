@@ -63,6 +63,8 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
             'retries' => 0,
             'snmp_max_repeaters' => 10,
             'community' => $community,
+            'os' => 'generic',
+            'os_group' => '',
         );
     }
 
@@ -1007,6 +1009,11 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
         $this->checkOS('pbn');
     }
 
+    public function testPbncpe()
+    {
+        $this->checkOS('pbn-cp');
+    }
+
     public function testPcoweb()
     {
         $this->checkOS('pcoweb');
@@ -1040,6 +1047,12 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
     public function testPoweralert()
     {
         $this->checkOS('poweralert');
+        $this->checkOS('poweralert', 'poweralert1');
+    }
+
+    public function testPowerconnect()
+    {
+        $this->checkOS('powerconnect');
     }
 
     public function testPowervault()
