@@ -46,6 +46,7 @@ function rrdtool_initialize($dual_process = true)
     );
 
     $cwd = $config['rrd_dir'];
+    putenv("TZ=" . ini_get('date.timezone'));
 
     if (!rrdtool_running($rrd_sync_process)) {
         $rrd_sync_process = new Proc($command, $descriptor_spec, $cwd);
