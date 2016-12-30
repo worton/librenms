@@ -232,11 +232,6 @@ function get_all_devices($device, $type = "")
     return $devices;
 }
 
-function port_by_id_cache($port_id)
-{
-    return get_port_by_id_cache('port', $port_id);
-}
-
 function table_from_entity_type($type)
 {
     // Fuck you, english pluralisation.
@@ -698,7 +693,8 @@ function c_echo($string, $enabled = true)
 function is_mib_graph($type, $subtype)
 {
     global $config;
-    return $config['graph_types'][$type][$subtype]['section'] == 'mib';
+    return isset($config['graph_types'][$type][$subtype]['section']) &&
+        $config['graph_types'][$type][$subtype]['section'] == 'mib';
 } // is_mib_graph
 
 
@@ -752,7 +748,7 @@ function get_graph_subtypes($type, $device = null)
 
         foreach ($config['graph_types'] as $type => $unused1) {
             foreach ($config['graph_types'][$type] as $subtype => $unused2) {
-                if (is_mib_graph($type, $subtype) && in_array($graphs, $subtype)) {
+                if (is_mib_graph($type, $subtype) && in_array($subtype, $graphs)) {
                     $types[] = $subtype;
                 }
             }
@@ -1488,6 +1484,26 @@ function get_auth_ad_group_filter($groupname)
 }
 
 /**
+ * Print a list of items up to a max amount
+ * If over that number, a line will print the total items
+ *
+ * @param array $list
+ * @param string $format format as consumed by printf()
+ * @param int $max the max amount of items to print, default 10
+ */
+function print_list($list, $format, $max = 10)
+{
+    foreach (array_slice($list, 0, $max) as $item) {
+        printf($format, $item);
+    }
+
+    $extra = count($list) - $max;
+    if ($extra > 0) {
+        printf($format, " and $extra more...");
+    }
+}
+
+/**
  * @param $value
  * @return string
  */
@@ -1502,5 +1518,38 @@ function clean($value)
  */
 function display($value)
 {
-    return htmlentities(stripslashes(strip_tags($value)));
+    $purifier = new HTMLPurifier(
+        HTMLPurifier_Config::createDefault()
+    );
+    return $purifier->purify(stripslashes($value));
+}
+
+/**
+ * @param $device
+ * @return array|mixed
+ */
+function load_os($device)
+{
+    global $config;
+    if (isset($device['os'])) {
+        return Symfony\Component\Yaml\Yaml::parse(
+            file_get_contents($config['install_dir'] . '/includes/definitions/' . $device['os'] . '.yaml')
+        );
+    }
+}
+
+function load_all_os($restricted = array())
+{
+    global $config;
+    if (!empty($restricted)) {
+        $list = $restricted;
+    } else {
+        $list = glob($config['install_dir'].'/includes/definitions/*.yaml');
+    }
+    foreach ($list as $file) {
+        $tmp = Symfony\Component\Yaml\Yaml::parse(
+            file_get_contents($file)
+        );
+        $config['os'][$tmp['os']] = $tmp;
+    }
 }

@@ -22,9 +22,6 @@
  * @subpackage Alerts
  */
 
-include_once($config['install_dir'].'/includes/common.inc.php');
-include_once($config['install_dir'].'/includes/device-groups.inc.php');
-include_once($config['install_dir'].'/html/includes/authentication/'.$config['auth_mechanism'].'.inc.php');
 
 /**
  * Generate SQL from Rule
@@ -174,8 +171,11 @@ function RunRules($device)
         }
         $sql = $rule['query'];
         $qry = dbFetchRows($sql, array($device));
-        if (isset($qry[0]['ip'])) {
-            $qry[0]['ip'] = inet6_ntop($qry[0]['ip']);
+        $cnt = count($qry);
+        for ($i = 0; $i < $cnt; $i++) {
+            if (isset($qry[$i]['ip'])) {
+                $qry[$i]['ip'] = inet6_ntop($qry[$i]['ip']);
+            }
         }
         $s = sizeof($qry);
         if ($s == 0 && $inv === false) {

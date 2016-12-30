@@ -25,10 +25,8 @@
  * @subpackage Alerts
  */
 
-chdir(__DIR__); // cwd to the directory containing this script
-
-require_once 'includes/defaults.inc.php';
-require_once 'config.php';
+$init_modules = array('alerts');
+require __DIR__ . '/includes/init.php';
 
 $options = getopt('d::');
 
@@ -47,9 +45,6 @@ if ($lock === true) {
     file_put_contents($config['install_dir'].'/.alerts.lock', getmypid());
 }
 
-require_once $config['install_dir'].'/includes/definitions.inc.php';
-require_once $config['install_dir'].'/includes/functions.php';
-require_once $config['install_dir'].'/includes/alerts.inc.php';
 
 if (isset($options['d'])) {
     echo "DEBUG!\n";
@@ -190,6 +185,13 @@ function RunFollowUp()
             $alert['query'] = GenSQL($alert['rule']);
         }
         $chk   = dbFetchRows($alert['query'], array($alert['device_id']));
+        //make sure we can json_encode all the datas later
+        $cnt = count($chk);
+        for ($i = 0; $i < $cnt; $i++) {
+            if (isset($chk[$i]['ip'])) {
+                $chk[$i]['ip'] = inet6_ntop($chk[$i]['ip']);
+            }
+        }
         $o     = sizeof($alert['details']['rule']);
         $n     = sizeof($chk);
         $ret   = 'Alert #'.$alert['id'];

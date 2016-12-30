@@ -23,6 +23,7 @@ source: Support/FAQ.md
  - [Why do I not see all interfaces in the Overall traffic graph for a device?](#faq23)
  - [How do I move my LibreNMS install to another server?](#faq24)
  - [Why is my EdgeRouter device not detected?](#faq25)
+ - [Why are some of my disks not showing?](#faq26)
 
 ### Developing
  - [How do I add support for a new OS?](#faq8)
@@ -54,7 +55,7 @@ You have two options for adding a new device into LibreNMS.
 
 We have a few methods for you to get in touch to ask for help.
 
-[Mailing List](https://groups.google.com/forum/#!forum/librenms-project)
+[Community Forum](https://community.librenms.org)
 
 [IRC](https://webchat.freenode.net/) Freenode ##librenms
 
@@ -227,14 +228,27 @@ If you have `service snmp description` set in your config then this will be why,
  
 If you don't have that set then this may be then due to an update of EdgeOS or a new device type, please [create an issue](https://github.com/librenms/librenms/issues/new).
 
+#### <a name="faq26"> Why are some of my disks not showing?</a>
+
+If you are monitoring a linux server then net-snmp doesn't always expose all disks via hrStorage (HOST-RESOURCES-MIB). We have additional support which will retrieve disks via dskTable (UCD-SNMP-MIB). 
+To expose these disks you need to add additional config to your snmpd.conf file. For example, to expose `/dev/sda1` which may be mounted as `/storage` you can specify:
+
+`disk /dev/sda1`
+
+Or
+
+`disk /storage`
+
+Restart snmpd and LibreNMS should populate the additional disk after a fresh discovery.
+
 #### <a name="faq8"> How do I add support for a new OS?</a>
 
 The easiest way to show you how to do that is to link to an existing pull request that has been merged in on [GitHub](https://github.com/librenms/librenms/pull/352/files)
 
 To go into a bit more detail, the following are usually needed:
 
-**includes/definitions.inc.php**
-Update this file to include the required definitions for the new OS.
+**includes/definitions/$os.yaml**
+Create this file to include the required definitions for the new OS.
 **includes/discovery/os/ciscowlc.inc.php**
 This file just sets the $os variable, done by checking the SNMP tree for a particular value that matches the OS you are adding.  Typically, this will come from the presence of specific values in
 sysObjectID or sysDescr, or the existence of a particular enterprise tree.

@@ -103,11 +103,14 @@ function discover_device($device, $options = null)
     if ($device['os'] == 'generic') {
         // verify if OS has changed from generic
         $device['os'] = getHostOS($device);
+
         if ($device['os'] != 'generic') {
             echo "\nDevice os was updated to " . $device['os'] . '!';
             dbUpdate(array('os' => $device['os']), 'devices', '`device_id` = ?', array($device['device_id']));
         }
     }
+
+    $config['os'][$device['os']] = load_os($device);
 
     // Set type to a predefined type for the OS if it's not already set
     if ($device['type'] == 'unknown' || $device['type'] == '') {
@@ -148,7 +151,7 @@ function discover_device($device, $options = null)
             include "includes/discovery/$module.inc.php";
             $module_time = microtime(true) - $module_start;
             $module_time = substr($module_time, 0, 5);
-            echo "\n>> Runtime for discovery module '$module': $module_time seconds\n";
+            printf("\n>> Runtime for discovery module '%s': %.4f seconds\n", $module, $module_time);
             echo "#### Unload disco module $module ####\n\n";
         } elseif (isset($attribs['discover_' . $module]) && $attribs['discover_' . $module] == '0') {
             echo "Module [ $module ] disabled on host.\n\n";
@@ -916,4 +919,36 @@ function get_toner_capacity($raw_capacity)
         return 100;
     }
     return $raw_capacity;
+}
+
+/**
+ * @param $descr
+ * @return int
+ */
+function ignore_storage($descr)
+{
+    global $config;
+    $deny = 0;
+    foreach ($config['ignore_mount'] as $bi) {
+        if ($bi == $descr) {
+            $deny = 1;
+            d_echo("$bi == $descr \n");
+        }
+    }
+
+    foreach ($config['ignore_mount_string'] as $bi) {
+        if (strpos($descr, $bi) !== false) {
+            $deny = 1;
+            d_echo("strpos: $descr, $bi \n");
+        }
+    }
+
+    foreach ($config['ignore_mount_regexp'] as $bi) {
+        if (preg_match($bi, $descr) > '0') {
+            $deny = 1;
+            d_echo("preg_match $bi, $descr \n");
+        }
+    }
+
+    return $deny;
 }
