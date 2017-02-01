@@ -30,9 +30,51 @@ over:
     - { graph: device_bits, text: 'Device Traffic' }
     - { graph: device_processor, text: 'CPU Usage' }
     - { graph: device_mempool, text: 'Memory Usage' }
+discovery:
+    - sysDescr:
+        - Pulse Connect Secure
+        - Pulse Secure
+        - Juniper Networks,Inc,VA-DTE
+        - VA-SPE
 ```
 
+#### Icon and Logo
+
+Create an SVG image of the icon and logo.  Legacy PNG bitmaps are also supported but look bad on HiDPI.
+- A vector image should not contain padding.  
+- The file should not be larger than 20 Kb. Simplify paths to reduce large files.
+- Use plain SVG without gzip compression.
+
+##### Icon
+- Save the icon SVG to **html/images/os/$os.svg**.
+- Icons should look good when viewed at 32x32 px.
+- Square icons are preferred to full logos with text.
+- Remove small ornaments that are almost not visible when displayed with 32px width (e.g. ® or ™).
+
+##### Logo
+- Save the logo SVG to **html/images/logos/$os.svg**.
+- Logos can be any dimension, but often are wide and contain the company name.
+- If a logo is not present, the icon will be used.
+
+##### Hints
+
+Hints for [Inkscape](https://inkscape.org/):
+
+- You can open a PDF to extract the logo.
+- Ungroup elements to isolate the logo.
+- Use `Path -> Simplify` to simplify paths of large files.
+- Use `File -> Document Properties… -> Resize page to content…` to remove padding.
+- Use `File -> Clean up document` to remove unused gradients, patterns, or markers.
+- Use `File -> Save As -> Plain SVG` to save the final image.
+
+By optimizing the SVG you can shrink the file size in some cases to less than 20 %.
+[SVG Optimizer](https://github.com/svg/svgo) does a great job. There is also an [online version](https://jakearchibald.github.io/svgomg/).
+
 #### Discovery OS
+
+> NOTE: In the above example, an discovery os file is not needed as we are matching the device based on the contents 
+of it's sysDescr value. You can also do this with sysObjectId. If you require a more complex discovery then you can 
+continue to create the os discovery file, below is an example:
 
 We create a new file named as our OS definition and in this directory:
 
@@ -144,7 +186,7 @@ over:
 ```
 
 If you are adding custom graphs, please add the following to `includes/definitions.inc.php`:
-
+```php
 //Don't forget to declare the specific graphs if needed. It will be located near the end of the file.
 
 //Pulse Secure Graphs
@@ -430,7 +472,7 @@ to supply an snmprec file. This is pretty simple and using nios as the example a
 1.3.6.1.2.1.1.2.0|6|1.3.6.1.4.1.7779.1.1402
 ```
 
-During testing LibreNMS will use any info in the snmprec file for snmp calls.  This one provides 
+During testing LibreNMS will use any info in the snmprec file for snmp calls.  This one provides
 sysDescr (`.1.3.6.1.2.1.1.1.0`, 4 = Octet String) and sysObjectID (`.1.3.6.1.2.1.1.2.0`, 6 = Object Identifier),
  which is the minimum that should be provided for new snmprec files.
 

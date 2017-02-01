@@ -21,9 +21,7 @@ poller_modules:
     cipsec-tunnels: 1
     cisco-otv: 1
     ipmi: 0
-    toner: 0
 discovery_modules:
-    toner: 0
     cisco-cef: 1
     cisco-sla: 1
     cisco-mac-accounting: 1
@@ -31,3 +29,9 @@ discovery_modules:
     cisco-pw: 1
     cisco-vrf: 1
     cisco-vrf-lite: 1
+register_mibs:
+    ciscoAAASessionMIB: CISCO-AAA-SESSION-MIB
+discovery:
+    - sysDescr:
+        - IOS-XE
+        - X86_64_LINUX_IOSD

@@ -43,7 +43,7 @@ function add_service($device, $type, $desc, $ip = 'localhost', $param = "", $ign
         $ip = $device['hostname'];
     }
 
-    $insert = array('device_id' => $device['device_id'], 'service_ip' => $ip, 'service_type' => $type, 'service_changed' => array('UNIX_TIMESTAMP(NOW())'), 'service_desc' => $desc, 'service_param' => $param, 'service_ignore' => $ignore, 'service_status' => 3, 'service_message' => 'Service not yet checked');
+    $insert = array('device_id' => $device['device_id'], 'service_ip' => $ip, 'service_type' => $type, 'service_changed' => array('UNIX_TIMESTAMP(NOW())'), 'service_desc' => $desc, 'service_param' => $param, 'service_ignore' => $ignore, 'service_status' => 3, 'service_message' => 'Service not yet checked', 'service_ds' => '{}');
     return dbInsert($insert, 'services');
 }
 
@@ -152,7 +152,7 @@ function poll_service($service)
             $DS[$k] = $v['uom'];
         }
         d_echo("Service DS: "._json_encode($DS)."\n");
-        if ($service['service_ds'] == "") {
+        if (($service['service_ds'] == "{}") || ($service['service_ds'] == "")) {
             $update['service_ds'] = json_encode($DS);
         }
 

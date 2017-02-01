@@ -5,3 +5,12 @@ type: printer
 icon: ricoh
 over:
     - { graph: device_toner, text: Toner }
+discovery:
+    - sysDescr:
+        - RICOH Aficio
+        - RICOH Network Printer
+discovery_modules:
+    toner: 1
+poller_modules:
+    toner: 1
+

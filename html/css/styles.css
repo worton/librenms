@@ -1580,8 +1580,13 @@ tr.search:nth-child(odd) {
 }
 
 .navbar-brand {
-  padding-left: 15px !important;
-  padding-top: 8px !important;
+  padding: 8px 15px 8px 15px !important;
+  line-height: 32px;
+}
+
+.navbar-brand img {
+  height: 100%;
+  max-width: 170px;
 }
 
 #visualization {
@@ -1647,8 +1652,12 @@ tr.search:nth-child(odd) {
 }
 
 .tt-suggestion:hover {
-	background-color: #0097CF;
-	color: #FFFFFF;
+  background-color: #0097CF;
+  color: #FFFFFF;
+}
+
+.tt-suggestion img {
+  width: 32px;
 }
 
 .gridster * {
@@ -1821,7 +1830,7 @@ label {
         max-width: 45px;
         max-height: 50px;
     }
-    .device-header-table .device_icon img {
+    .device-header-table .device-icon .device-icon-48h img {
        max-width: 20px;
        max-height: 20px;
     }
@@ -1901,7 +1910,7 @@ label {
 .widget_body {
     overflow-y: auto;
     width: 100%;
-    height: calc(100% - 35px);
+    height: calc(100% - 5px);
 }
 
 .device-availability, .service-availability {
@@ -2124,8 +2133,34 @@ label {
     text-align: center;
 }
 
+.device-table-header-actions {
+  min-width: 120px;
+  text-align: center;
+}
+
 .device-table-icon {
     text-align: center;
     display: block;
     width: 70px;
+    height: 32px;
+    line-height: 32px;
+}
+
+.device-table-icon img {
+    width: 32px;
+}
+
+.device-icon img {
+    max-height: 32px;
+    max-width: 40px;
+}
+
+.device-icon {
+  display: inline-block;
+  height: 32px;
+  width: 40px;
+}
+
+.device-icon-48h img {
+  height: 48px;
 }

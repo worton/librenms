@@ -18,28 +18,29 @@ function discover_new_device($hostname, $device = '', $method = '', $interface =
 {
     global $config;
 
-    if (!empty($config['mydomain']) && isDomainResolves($hostname . '.' . $config['mydomain'])) {
-        $dst_host = $hostname . '.' . $config['mydomain'];
-    } else {
-        $dst_host = $hostname;
+    if (!empty($config['mydomain'])) {
+        $full_host = rtrim($hostname, '.') . '.' . $config['mydomain'];
+        if (isDomainResolves($full_host)) {
+            $hostname = $full_host;
+        }
     }
 
-    d_echo("discovering $dst_host\n");
+    d_echo("discovering $hostname\n");
 
-    $ip = gethostbyname($dst_host);
+    $ip = gethostbyname($hostname);
     if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false) {
         // $ip isn't a valid IP so it must be a name.
-        if ($ip == $dst_host) {
-            d_echo("name lookup of $dst_host failed\n");
-            log_event("$method discovery of " . $dst_host  . " failed - Check name lookup", $device['device_id'], 'discovery');
+        if ($ip == $hostname) {
+            d_echo("name lookup of $hostname failed\n");
+            log_event("$method discovery of " . $hostname  . " failed - Check name lookup", $device['device_id'], 'discovery');
  
             return false;
         }
-    } elseif (filter_var($dst_host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === true || filter_var($dst_host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === true) {
+    } elseif (filter_var($hostname, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === true || filter_var($hostname, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === true) {
         // gethostbyname returned a valid $ip, was $dst_host an IP?
         if ($config['discovery_by_ip'] === false) {
-            d_echo('Discovery by IP disabled, skipping ' . $dst_host);
-            log_event("$method discovery of " . $dst_host . " failed - Discovery by IP disabled", $device['device_id'], 'discovery');
+            d_echo('Discovery by IP disabled, skipping ' . $hostname);
+            log_event("$method discovery of " . $hostname . " failed - Discovery by IP disabled", $device['device_id'], 'discovery');
  
             return false;
         }
@@ -47,7 +48,7 @@ function discover_new_device($hostname, $device = '', $method = '', $interface =
 
     d_echo("ip lookup result: $ip\n");
 
-    $dst_host = rtrim($dst_host, '.');
+    $hostname = rtrim($hostname, '.');
     // remove trailing dot
     if (match_network($config['autodiscovery']['nets-exclude'], $ip)) {
         d_echo("$ip in an excluded network - skipping\n");
@@ -57,7 +58,7 @@ function discover_new_device($hostname, $device = '', $method = '', $interface =
 
     if (match_network($config['nets'], $ip)) {
         try {
-            $remote_device_id = addHost($dst_host, '', '161', 'udp', $config['distributed_poller_group']);
+            $remote_device_id = addHost($hostname, '', '161', 'udp', $config['distributed_poller_group']);
             $remote_device = device_by_id_cache($remote_device_id, 1);
             echo '+[' . $remote_device['hostname'] . '(' . $remote_device['device_id'] . ')]';
             discover_device($remote_device);
@@ -78,7 +79,7 @@ function discover_new_device($hostname, $device = '', $method = '', $interface =
         } catch (HostExistsException $e) {
             // already have this device
         } catch (Exception $e) {
-            log_event("$method discovery of " . $dst_host . " ($ip) failed - " . $e->getMessage());
+            log_event("$method discovery of " . $hostname . " ($ip) failed - " . $e->getMessage());
         }
     } else {
         d_echo("$ip not in a matched network - skipping\n");
@@ -94,6 +95,7 @@ function discover_device($device, $options = null)
     $valid = array();
     // Reset $valid array
     $attribs = get_dev_attribs($device['device_id']);
+    $device['attribs'] = $attribs;
     $device['snmp_max_repeaters'] = $attribs['snmp_max_repeaters'];
 
     $device_start = microtime(true);
@@ -110,18 +112,9 @@ function discover_device($device, $options = null)
         }
     }
 
-    $config['os'][$device['os']] = load_os($device);
-
-    // Set type to a predefined type for the OS if it's not already set
-    if ($device['type'] == 'unknown' || $device['type'] == '') {
-        if ($config['os'][$device['os']]['type']) {
-            $device['type'] = $config['os'][$device['os']]['type'];
-        }
-    }
-
-    if ($config['os'][$device['os']]['group']) {
-        $device['os_group'] = $config['os'][$device['os']]['group'];
-        echo ' (' . $device['os_group'] . ')';
+    load_os($device);
+    if (is_array($config['os'][$device['os']]['register_mibs'])) {
+        register_mibs($device, $config['os'][$device['os']]['register_mibs'], 'includes/discovery/os/' . $device['os'] . '.inc.php');
     }
 
     echo "\n";
@@ -171,7 +164,7 @@ function discover_device($device, $options = null)
     $device_run = ($device_end - $device_start);
     $device_time = substr($device_run, 0, 5);
 
-    dbUpdate(array('last_discovered' => array('NOW()'), 'type' => $device['type'], 'last_discovered_timetaken' => $device_time), 'devices', '`device_id` = ?', array($device['device_id']));
+    dbUpdate(array('last_discovered' => array('NOW()'), 'last_discovered_timetaken' => $device_time), 'devices', '`device_id` = ?', array($device['device_id']));
 
     echo "Discovered in $device_time seconds\n";
 
@@ -187,6 +180,16 @@ function discover_device($device, $options = null)
 
 function discover_sensor(&$valid, $class, $device, $oid, $index, $type, $descr, $divisor = '1', $multiplier = '1', $low_limit = null, $low_warn_limit = null, $warn_limit = null, $high_limit = null, $current = null, $poller_type = 'snmp', $entPhysicalIndex = null, $entPhysicalIndex_measured = null)
 {
+
+    $low_limit      = set_null($low_limit);
+    $low_warn_limit = set_null($low_warn_limit);
+    $warn_limit     = set_null($warn_limit);
+    $high_limit     = set_null($high_limit);
+
+    if (!is_numeric($divisor)) {
+        $divisor  = 1;
+    }
+
     d_echo("Discover sensor: $oid, $index, $type, $descr, $poller_type, $precision, $entPhysicalIndex\n");
 
     if (is_null($low_warn_limit) && !is_null($warn_limit)) {
@@ -671,7 +674,7 @@ function discover_toner(&$valid, $device, $oid, $index, $type, $descr, $capacity
 {
     d_echo("Discover Toner: $oid, $index, $type, $descr, $capacity_oid, $capacity, $current\n");
 
-    if (dbFetchCell('SELECT COUNT(toner_id) FROM `toner` WHERE device_id = ? AND toner_type = ? AND `toner_index` = ? AND `toner_capacity_oid` =?', array($device['device_id'], $type, $index, $capacity_oid)) == '0') {
+    if (dbFetchCell('SELECT COUNT(toner_id) FROM `toner` WHERE device_id = ? AND toner_type = ? AND `toner_index` = ? AND `toner_oid` =?', array($device['device_id'], $type, $index, $oid)) == '0') {
         $inserted = dbInsert(array('device_id' => $device['device_id'], 'toner_oid' => $oid, 'toner_capacity_oid' => $capacity_oid, 'toner_index' => $index, 'toner_type' => $type, 'toner_descr' => $descr, 'toner_capacity' => $capacity, 'toner_current' => $current), 'toner');
         echo '+';
         log_event('Toner added: type ' . mres($type) . ' index ' . mres($index) . ' descr ' . mres($descr), $device, 'toner', $inserted);
@@ -685,7 +688,7 @@ function discover_toner(&$valid, $device, $oid, $index, $type, $descr, $capacity
         }
     }
 
-    $valid[$type][$index] = 1;
+    $valid[$type][$oid] = 1;
 }
 
 //end discover_toner()
@@ -710,7 +713,7 @@ function discover_process_ipv6(&$valid, $ifIndex, $ipv6_address, $ipv6_prefixlen
             echo 'N';
         } else {
             //Update Context
-            dbUpdate(array('context_name' => $device['context_name']), 'ipv6_network', '`ipv6_network` = ?', array($ipv6_network));
+            dbUpdate(array('context_name' => $device['context_name']), 'ipv6_networks', '`ipv6_network` = ?', array($ipv6_network));
             echo 'n';
         }
 
@@ -722,7 +725,7 @@ function discover_process_ipv6(&$valid, $ifIndex, $ipv6_address, $ipv6_prefixlen
             echo '+';
         } else {
             //Update Context
-            dbUpdate(array('context_name' => $device['context_name']), 'ipv6_address', '`ipv6_address` = ? AND `ipv6_prefixlen` = ? AND `port_id` = ?', array($ipv6_address, $ipv6_prefixlen, $port_id));
+            dbUpdate(array('context_name' => $device['context_name']), 'ipv6_addresses', '`ipv6_address` = ? AND `ipv6_prefixlen` = ? AND `port_id` = ?', array($ipv6_address, $ipv6_prefixlen, $port_id));
             echo '.';
         }
 

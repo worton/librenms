@@ -97,6 +97,9 @@ function nicecase($item)
         case 'gpsd':
             return 'GPSD';
 
+        case 'exim-stats':
+            return 'EXIM Stats';
+
         default:
             return ucfirst($item);
     }
@@ -298,13 +301,18 @@ function generate_device_link($device, $text = null, $vars = array(), $start = 0
 }//end generate_device_link()
 
 
-function overlib_link($url, $text, $contents, $class)
+function overlib_link($url, $text, $contents, $class = null)
 {
     global $config;
 
     $contents = "<div style=\'background-color: #FFFFFF;\'>".$contents.'</div>';
     $contents = str_replace('"', "\'", $contents);
-    $output   = '<a class="'.$class.'" href="'.$url.'"';
+    if ($class === null) {
+        $output   = '<a href="'.$url.'"';
+    } else {
+        $output   = '<a class="'.$class.'" href="'.$url.'"';
+    }
+
     if ($config['web_mouseover'] === false) {
         $output .= '>';
     } else {
@@ -702,32 +710,38 @@ function print_optionbar_end()
 
 function geteventicon($message)
 {
-    if ($message == 'Device status changed to Down') {
-        $icon = 'server_connect.png';
+    if ($message == 'Device status changed to Down from check') {
+        $icon = 'fa-bookmark';
+        $icon_colour = 'red';
     }
 
-    if ($message == 'Device status changed to Up') {
-        $icon = 'server_go.png';
+    if ($message == 'Device status changed to Up from check') {
+        $icon = 'fa-bookmark';
+        $icon_colour = 'green';
     }
 
-    if ($message == 'Interface went down' || $message == 'Interface changed state to Down') {
-        $icon = 'if-disconnect.png';
+    if ($message == 'Interface went down' || $message == 'Interface changed state to Down' || $message == 'ifOperStatus: up -> down') {
+        $icon = 'fa-bookmark';
+        $icon_colour = 'red';
     }
 
-    if ($message == 'Interface went up' || $message == 'Interface changed state to Up') {
-        $icon = 'if-connect.png';
+    if ($message == 'Interface went up' || $message == 'Interface changed state to Up' || $message == 'ifOperStatus: down -> up') {
+        $icon = 'fa-bookmark';
+        $icon_colour = 'green';
     }
 
-    if ($message == 'Interface disabled') {
-        $icon = 'if-disable.png';
+    if ($message == 'Interface disabled' || $message == 'ifAdminStatus: up -> down') {
+        $icon = 'fa-bookmark';
+        $icon_colour = 'grey';
     }
 
-    if ($message == 'Interface enabled') {
-        $icon = 'if-enable.png';
+    if ($message == 'Interface enabled' || $message == 'ifAdminStatus: down -> up') {
+        $icon = 'fa-bookmark';
+        $icon_colour = 'green';
     }
 
     if (isset($icon)) {
-        return $icon;
+        return array('icon' => $icon,'colour' => $icon_colour);
     } else {
         return false;
     }
@@ -788,9 +802,9 @@ function getlocations()
 
     // Fetch regular locations
     if ($_SESSION['userlevel'] >= '5') {
-        $rows = dbFetchRows('SELECT D.device_id,location FROM devices AS D GROUP BY location ORDER BY location');
+        $rows = dbFetchRows('SELECT location FROM devices AS D GROUP BY location ORDER BY location');
     } else {
-        $rows = dbFetchRows('SELECT D.device_id,location FROM devices AS D, devices_perms AS P WHERE D.device_id = P.device_id AND P.user_id = ? GROUP BY location ORDER BY location', array($_SESSION['user_id']));
+        $rows = dbFetchRows('SELECT location FROM devices AS D, devices_perms AS P WHERE D.device_id = P.device_id AND P.user_id = ? GROUP BY location ORDER BY location', array($_SESSION['user_id']));
     }
 
     foreach ($rows as $row) {
@@ -1024,6 +1038,19 @@ function get_client_ip()
     return $client_ip;
 }//end get_client_ip()
 
+/**
+ * @param $string
+ * @param int $max
+ * @return string
+ */
+function shorten_text($string, $max = 30)
+{
+    if (strlen($string) > 50) {
+        return substr($string, 0, $max) . "...";
+    } else {
+        return $string;
+    }
+}
 
 function shorten_interface_type($string)
 {
@@ -1361,4 +1388,24 @@ function get_rules_from_json()
 {
     global $config;
     return json_decode(file_get_contents($config['install_dir'] . '/misc/alert_rules.json'), true);
+}
+
+function search_oxidized_config($search_in_conf_textbox)
+{
+    global $config;
+    $oxidized_search_url = $config['oxidized']['url'] . '/nodes/conf_search?format=json';
+    $postdata = http_build_query(
+        array(
+            'search_in_conf_textbox' => $search_in_conf_textbox,
+        )
+    );
+    $opts = array('http' =>
+        array(
+            'method'  => 'POST',
+            'header'  => 'Content-type: application/x-www-form-urlencoded',
+            'content' => $postdata
+        )
+    );
+    $context  = stream_context_create($opts);
+    return json_decode(file_get_contents($oxidized_search_url, false, $context), true);
 }

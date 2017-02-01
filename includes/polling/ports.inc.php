@@ -128,7 +128,7 @@ echo 'Caching Oids: ';
 if (0 && $device['os'] === 'f5' && (version_compare($device['version'], '11.2.0', '>=') && version_compare($device['version'], '11.7', '<'))) {
     require_once 'ports/f5.inc.php';
 } else {
-    if (!in_array($device['hardware'], $config['os'][$device['os']]['bad_ifXEntry'])) {
+    if (!in_array(strtolower($device['hardware']), array_map('strtolower', $config['os'][$device['os']]['bad_ifXEntry']))) {
         $port_stats = snmpwalk_cache_oid($device, 'ifXEntry', $port_stats, 'IF-MIB');
     }
     $hc_test = array_slice($port_stats, 0, 1);
@@ -456,6 +456,11 @@ foreach ($ports as $port) {
             d_echo('Using ifDescr as ifAlias');
         }
 
+        if ($this_port['ifName'] == '' || $this_port['ifName'] == null) {
+            $this_port['ifName'] = $this_port['ifDescr'];
+            d_echo('Using ifDescr as ifName');
+        }
+
         // Update IF-MIB data
         $tune_port = false;
         foreach ($data_oids as $oid) {
@@ -549,7 +554,7 @@ foreach ($ports as $port) {
             }
 
             if ($config['slow_statistics'] == true) {
-                $port[$port_update][$oid]         = $this_port[$oid];
+                $port[$port_update][$oid]         = set_numeric($this_port[$oid]);
                 $port[$port_update][$oid.'_prev'] = $port[$oid];
             }
 

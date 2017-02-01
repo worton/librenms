@@ -969,6 +969,12 @@ $rewrite_hrDevice = array(
     '  '            => ' ',
 );
 
+$rewrite_GenericHW = array(
+    ' Computer Corporation' => '',
+    ' Corporation'          => '',
+    ' Inc.'                 => '',
+);
+
 // Specific rewrite functions
 
 
@@ -1053,6 +1059,11 @@ function rewrite_junos_hardware($hardware)
     return ($hardware);
 }
 
+function rewrite_generic_hardware($hardware)
+{
+    global $rewrite_GenericHW;
+    return array_str_replace($rewrite_GenericHW, $hardware);
+}
 
 function fixiftype($type)
 {
@@ -1419,3 +1430,30 @@ function rewrite_ceraos_hardware($ceragon_type, $device)
     }
     return $hardware;
 };
+
+/**
+ * @param $descr
+ * @return int
+ */
+function get_nagios_state($descr)
+{
+    switch ($descr) {
+        case 'On':
+        case 'Okay':
+        case 'Ok':
+            return 0;
+            break;
+        case 'Standby':
+        case 'Idle':
+        case 'Maintenance':
+            return 1;
+            break;
+        case 'Under':
+        case 'Over':
+            return 2;
+            break;
+        default:
+            return 3;
+            break;
+    }
+}

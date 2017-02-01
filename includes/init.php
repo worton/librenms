@@ -23,13 +23,9 @@
  * @author     Tony Murray <murraytony@gmail.com>
  */
 
-
 /**
- * @param array $modules
+ * @param array $modules Which modules to initialize
  */
-//function librenms_init($init_modules = array())
-//{
-//global $console_color, $config;
 
 $install_dir = realpath(__DIR__ . '/..');
 $config['install_dir'] = $install_dir;
@@ -39,20 +35,11 @@ chdir($install_dir);
 require('Net/IPv4.php');
 require('Net/IPv6.php');
 
-// initialize the class loader and add custom mappings
-require $install_dir . '/LibreNMS/ClassLoader.php';
-$classLoader = new LibreNMS\ClassLoader();
-$classLoader->registerClass('Console_Color2', $config['install_dir'] . '/lib/console_colour.php');
-$classLoader->registerClass('Console_Table', $config['install_dir'] . '/lib/console_table.php');
-$classLoader->registerClass('PHPMailer', $config['install_dir'] . "/lib/phpmailer/class.phpmailer.php");
-$classLoader->registerClass('SMTP', $config['install_dir'] . "/lib/phpmailer/class.smtp.php");
-$classLoader->registerClass('PasswordHash', $config['install_dir'] . '/html/lib/PasswordHash.php');
-//    $classLoader->registerDir($install_dir . '/tests', 'LibreNMS\Tests');
-$classLoader->register();
+# composer autoload
+require $install_dir . '/vendor/autoload.php';
 if (version_compare(PHP_VERSION, '5.4', '>=')) {
     require $install_dir . '/lib/influxdb-php/vendor/autoload.php';
 }
-require $install_dir . '/lib/yaml/vendor/autoload.php';
 
 // function only files
 require_once $install_dir . '/includes/common.php';
@@ -67,7 +54,6 @@ require $install_dir . '/includes/services.inc.php';
 require $install_dir . '/includes/mergecnf.inc.php';
 require $install_dir . '/includes/functions.php';
 require $install_dir . '/includes/rewrites.php';  // FIXME both definitions and functions
-require $install_dir . '/lib/htmlpurifier-4.8.0-lite/library/HTMLPurifier.auto.php';
 
 if (module_selected('web', $init_modules)) {
     chdir($install_dir . '/html');
@@ -111,7 +97,7 @@ if ($config['memcached']['enable'] === true) {
 
 if (!module_selected('nodb', $init_modules)) {
     // Connect to database
-    $database_link = mysqli_connect('p:' . $config['db_host'], $config['db_user'], $config['db_pass']);
+    $database_link = mysqli_connect('p:' . $config['db_host'], $config['db_user'], $config['db_pass'], null, $config['db_port']);
     if (!$database_link) {
         echo '<h2>MySQL Error</h2>';
         echo mysqli_connect_error();
@@ -135,6 +121,9 @@ if (file_exists($config['install_dir'] . '/html/includes/authentication/'.$confi
 
 if (module_selected('web', $init_modules)) {
     umask(0002);
+    if (!isset($config['title_image'])) {
+        $config['title_image'] = 'images/librenms_logo_'.$config['site_style'].'.svg';
+    }
     require $install_dir . '/html/includes/vars.inc.php';
     $tmp_list = dbFetchRows('SELECT DISTINCT(`os`) FROM `devices`');
     $os_list = array();
