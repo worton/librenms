@@ -1,6 +1,8 @@
 <?php
 
 // Build SNMP Cache Array
+use LibreNMS\RRD\RrdDefinition;
+
 $data_oids = array(
     'ifName',
     'ifDescr',
@@ -180,17 +182,12 @@ if (0 && $device['os'] === 'f5' && (version_compare($device['version'], '11.2.0'
 } else {
     if ($config['polling']['selected_ports'] === true || $device['attribs']['selected_ports'] == 'true') {
         echo('Select ports polling');
-        foreach ($table_base_oids as $oid) {
-            $data = snmpwalk_cache_oid($device, $oid, $data, 'IF-MIB');
-        }
-        unset(
-            $oid,
-            $table_base_oids
-        );
         $lports = dbFetchRows("SELECT * FROM `ports` where `device_id` = ? AND `deleted` = 0 AND `disabled` = 0", array($device['device_id']));
         foreach ($lports as $lport) {
             if (is_port_valid($lport, $device)) {
                 $i = $lport['ifIndex'];
+                $base_oids = implode(".$i ", $table_base_oids) . ".$i";
+                $data = snmp_get_multi($device, $base_oids, '-OQUst', 'IF-MIB', null, $data);
                 if ($lport['ifAdminStatus_prev'] === 'down' && $data[$i]['ifAdminStatus'] === 'down') {
                     echo 'port is still admin down';
                 } elseif ($lport['ifOperStatus_prev'] === 'down' && $data[$i]['ifOperStatus'] === 'down') {
@@ -705,23 +702,22 @@ foreach ($ports as $port) {
         // Update data stores
         $rrd_name = getPortRrdName($port_id);
         $rrdfile = rrd_name($device['hostname'], $rrd_name);
-        $rrd_def = array(
-            'DS:INOCTETS:DERIVE:600:0:12500000000',
-            'DS:OUTOCTETS:DERIVE:600:0:12500000000',
-            'DS:INERRORS:DERIVE:600:0:12500000000',
-            'DS:OUTERRORS:DERIVE:600:0:12500000000',
-            'DS:INUCASTPKTS:DERIVE:600:0:12500000000',
-            'DS:OUTUCASTPKTS:DERIVE:600:0:12500000000',
-            'DS:INNUCASTPKTS:DERIVE:600:0:12500000000',
-            'DS:OUTNUCASTPKTS:DERIVE:600:0:12500000000',
-            'DS:INDISCARDS:DERIVE:600:0:12500000000',
-            'DS:OUTDISCARDS:DERIVE:600:0:12500000000',
-            'DS:INUNKNOWNPROTOS:DERIVE:600:0:12500000000',
-            'DS:INBROADCASTPKTS:DERIVE:600:0:12500000000',
-            'DS:OUTBROADCASTPKTS:DERIVE:600:0:12500000000',
-            'DS:INMULTICASTPKTS:DERIVE:600:0:12500000000',
-            'DS:OUTMULTICASTPKTS:DERIVE:600:0:12500000000'
-        );
+        $rrd_def = RrdDefinition::make()
+            ->addDataset('INOCTETS', 'DERIVE', 0, 12500000000)
+            ->addDataset('OUTOCTETS', 'DERIVE', 0, 12500000000)
+            ->addDataset('INERRORS', 'DERIVE', 0, 12500000000)
+            ->addDataset('OUTERRORS', 'DERIVE', 0, 12500000000)
+            ->addDataset('INUCASTPKTS', 'DERIVE', 0, 12500000000)
+            ->addDataset('OUTUCASTPKTS', 'DERIVE', 0, 12500000000)
+            ->addDataset('INNUCASTPKTS', 'DERIVE', 0, 12500000000)
+            ->addDataset('OUTNUCASTPKTS', 'DERIVE', 0, 12500000000)
+            ->addDataset('INDISCARDS', 'DERIVE', 0, 12500000000)
+            ->addDataset('OUTDISCARDS', 'DERIVE', 0, 12500000000)
+            ->addDataset('INUNKNOWNPROTOS', 'DERIVE', 0, 12500000000)
+            ->addDataset('INBROADCASTPKTS', 'DERIVE', 0, 12500000000)
+            ->addDataset('OUTBROADCASTPKTS', 'DERIVE', 0, 12500000000)
+            ->addDataset('INMULTICASTPKTS', 'DERIVE', 0, 12500000000)
+            ->addDataset('OUTMULTICASTPKTS', 'DERIVE', 0, 12500000000);
 
         $fields = array(
             'INOCTETS'         => $this_port['ifInOctets'],

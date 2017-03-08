@@ -12,6 +12,8 @@
  * See COPYING for more details.
  */
 
+use LibreNMS\RRD\RrdDefinition;
+
 unset($poll_device);
 
 $snmpdata = snmp_get_multi($device, 'sysUpTime.0 sysLocation.0 sysContact.0 sysName.0 sysObjectID.0', '-OQnUst', 'SNMPv2-MIB:HOST-RESOURCES-MIB:SNMP-FRAMEWORK-MIB');
@@ -32,9 +34,6 @@ if (empty($uptime)) {
     $snmp_uptime = (integer)$uptime_data['snmpEngineTime'];
     $hrSystemUptime = $uptime_data['hrSystemUptime'];
     if (!empty($hrSystemUptime) && !strpos($hrSystemUptime, 'No') && ($device['os'] != 'windows')) {
-        // Move uptime into agent_uptime
-        $agent_uptime = $uptime;
-
         $uptime = floor($hrSystemUptime / 100);
         echo 'Using hrSystemUptime (' . $uptime . "s)\n";
     } else {
@@ -52,11 +51,11 @@ if ($config['os'][$device['os']]['bad_snmpEngineTime'] !== true) {
 
 if (is_numeric($uptime) && ($config['os'][$device['os']]['bad_uptime'] !== true)) {
     if ($uptime < $device['uptime']) {
-        log_event('Device rebooted after ' . formatUptime($device['uptime']), $device, 'reboot', 4, $device['uptime']);
+        log_event('Device rebooted after ' . formatUptime($device['uptime']) . ' -> ' . $uptime, $device, 'reboot', 4, $device['uptime']);
     }
 
     $tags = array(
-        'rrd_def' => 'DS:uptime:GAUGE:600:0:U',
+        'rrd_def' => RrdDefinition::make()->addDataset('uptime', 'GAUGE', 0),
     );
     data_update($device, 'uptime', $tags, $uptime);
 

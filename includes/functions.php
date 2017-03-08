@@ -224,12 +224,18 @@ function getLogo($device)
 }
 
 /**
- * @param $device
+ * @param array $device
+ * @param string $class to apply to the image tag
  * @return string an image tag with the logo for this device. Images are often wide, not square.
  */
-function getLogoTag($device)
+function getLogoTag($device, $class = null)
 {
-    return '<img src="' . getLogo($device) . '" title="' . getImageTitle($device) . '"/>';
+    $tag = '<img src="' . getLogo($device) . '" title="' . getImageTitle($device) . '"';
+    if (isset($class)) {
+        $tag .= " class=\"$class\" ";
+    }
+    $tag .= ' />';
+    return  $tag;
 }
 
 /**
@@ -337,6 +343,11 @@ function delete_device($id)
         $ret .= "Removed interface $int_id ($int_if)\n";
     }
 
+    // Remove sensors manually due to constraints
+    foreach (dbFetchRows("SELECT * FROM `sensors` WHERE `device_id` = ?", array($id)) as $sensor) {
+        $sensor_id = $sensor['sensor_id'];
+        dbDelete('sensors_to_state_indexes', "`sensor_id` = ?", array($sensor));
+    }
     $fields = array('device_id','host');
     foreach ($fields as $field) {
         foreach (dbFetch("SELECT table_name FROM information_schema.columns WHERE table_schema = ? AND column_name = ?", array($config['db_name'],$field)) as $table) {
@@ -557,15 +568,16 @@ function isSNMPable($device)
 {
     global $config;
 
-    $pos = snmp_get($device, "sysObjectID.0", "-Oqv", "SNMPv2-MIB");
-    if (empty($pos)) {
-        // Support for Hikvision
-        $pos = snmp_get($device, "SNMPv2-SMI::enterprises.39165.1.1.0", "-Oqv", "SNMPv2-MIB");
-    }
-    if ($pos === '' || $pos === false) {
-        return false;
-    } else {
+    $pos = snmp_check($device);
+    if ($pos === true) {
         return true;
+    } else {
+        $pos = snmp_get($device, "sysObjectID.0", "-Oqv", "SNMPv2-MIB");
+        if ($pos === '' || $pos === false) {
+            return false;
+        } else {
+            return true;
+        }
     }
 }
 
@@ -637,9 +649,35 @@ function getpollergroup($poller_group = '0')
     }
 }
 
-function createHost($host, $community, $snmpver, $port = 161, $transport = 'udp', $v3 = array(), $poller_group = '0', $port_assoc_mode = 'ifIndex', $snmphost = '', $force_add = false)
-{
-    global $config;
+/**
+ * Add a host to the database
+ *
+ * @param string $host The IP or hostname to add
+ * @param string $community The snmp community
+ * @param string $snmpver snmp version: v1 | v2c | v3
+ * @param int $port SNMP port number
+ * @param string $transport SNMP transport: udp | udp6 | udp | tcp6
+ * @param array $v3 SNMPv3 settings required array keys: authlevel, authname, authpass, authalgo, cryptopass, cryptoalgo
+ * @param int $poller_group distributed poller group to assign this host to
+ * @param string $port_assoc_mode field to use to identify ports: ifIndex, ifName, ifDescr, ifAlias
+ * @param string $snmphost device sysName to check for duplicates
+ * @param bool $force_add Do not detect the host os
+ * @return int the id of the added host
+ * @throws HostExistsException Throws this exception if the host already exists
+ * @throws Exception Throws this exception if insertion into the database fails
+ */
+function createHost(
+    $host,
+    $community,
+    $snmpver,
+    $port = 161,
+    $transport = 'udp',
+    $v3 = array(),
+    $poller_group = 0,
+    $port_assoc_mode = 'ifIndex',
+    $snmphost = '',
+    $force_add = false
+) {
     $host = trim(strtolower($host));
 
     $poller_group=getpollergroup($poller_group);
@@ -650,8 +688,10 @@ function createHost($host, $community, $snmpver, $port = 161, $transport = 'udp'
         $port_assoc_mode = get_port_assoc_mode_id($port_assoc_mode);
     }
 
-    $device = array('hostname' => $host,
+    $device = array(
+        'hostname' => $host,
         'sysName' => $host,
+        'os' => 'generic',
         'community' => $community,
         'port' => $port,
         'transport' => $transport,
@@ -662,28 +702,23 @@ function createHost($host, $community, $snmpver, $port = 161, $transport = 'udp'
         'port_association_mode' => $port_assoc_mode,
     );
 
-    $device = array_merge($device, $v3);
+    $device = array_merge($device, $v3);  // merge v3 settings
 
     if ($force_add !== true) {
         $device['os'] = getHostOS($device);
-    } else {
-        $device['os'] = 'generic';
     }
 
-    if ($device['os']) {
-        if (host_exists($host, $snmphost) === false) {
-            $device_id = dbInsert($device, 'devices');
-            if ($device_id) {
-                oxidized_reload_nodes();
-                return $device_id;
-            }
-        } else {
-            throw new HostExistsException("Already have host $host ($snmphost)");
-        }
+    if (host_exists($host, $snmphost)) {
+        throw new HostExistsException("Already have host $host ($snmphost)");
     }
 
-    // couldn't add the device
-    return false;
+    $device_id = dbInsert($device, 'devices');
+    if ($device_id) {
+        oxidized_reload_nodes();
+        return $device_id;
+    }
+
+    throw new \Exception("Failed to add host to the database, please run ./validate.php");
 }
 
 function isDomainResolves($domain)
@@ -835,9 +870,7 @@ function send_mail($emails, $subject, $message, $html = false)
     if (is_array($emails) || ($emails = parse_email($emails))) {
         $mail = new PHPMailer();
         $mail->Hostname = php_uname('n');
-        if (empty($config['email_from'])) {
-            $config['email_from'] = '"' . $config['project_name'] . '" <' . $config['email_user'] . '@'.$mail->Hostname.'>';
-        }
+
         foreach (parse_email($config['email_from']) as $from => $from_name) {
             $mail->setFrom($from, $from_name);
         }
@@ -924,7 +957,7 @@ function snmp_hexstring($hex)
 # Check if the supplied string is an SNMP hex string
 function isHexString($str)
 {
-    return preg_match("/^[a-f0-9][a-f0-9]( [a-f0-9][a-f0-9])*$/is", trim($str));
+    return (bool)preg_match("/^[a-f0-9][a-f0-9]( [a-f0-9][a-f0-9])*$/is", trim($str));
 }
 
 # Include all .inc.php files in $dir
@@ -1438,10 +1471,10 @@ function snmpTransportToAddressFamily($transport)
  * Checks if the $hostname provided exists in the DB already
  *
  * @param string $hostname The hostname to check for
- *
+ * @param string $snmphost The sysName to check
  * @return bool true if hostname already exists
  *              false if hostname doesn't exist
-**/
+ */
 function host_exists($hostname, $snmphost = '')
 {
     global $config;
@@ -1450,7 +1483,12 @@ function host_exists($hostname, $snmphost = '')
         return true;
     } else {
         if ($config['allow_duplicate_sysName'] === false && !empty($snmphost)) {
-            $count = dbFetchCell("SELECT COUNT(*) FROM `devices` WHERE `sysName` = ?", array($snmphost));
+            if (!empty($config['mydomain'])) {
+                $full_host = rtrim($snmphost, '.') . '.' . $config['mydomain'];
+                $count = dbFetchCell("SELECT COUNT(*) FROM `devices` WHERE `sysName` = ? or `sysName` = ?", array($snmphost,$full_host));
+            } else {
+                $count = dbFetchCell("SELECT COUNT(*) FROM `devices` WHERE `sysName` = ?", array($snmphost));
+            }
             if ($count > 0) {
                 return true;
             } else {

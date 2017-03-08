@@ -13,7 +13,7 @@ mysql -uroot -p
 ```
 
 ```sql
-CREATE DATABASE librenms;
+CREATE DATABASE librenms CHARACTER SET utf8 COLLATE utf8_unicode_ci;
 GRANT ALL PRIVILEGES ON librenms.*
   TO 'librenms'@'localhost'
   IDENTIFIED BY '<password>'
@@ -31,7 +31,10 @@ innodb_file_per_table=1
 sql-mode=""
 ```
 
-```systemctl restart mariadb```
+```
+systemctl enable mariadb  
+systemctl restart mariadb
+```
 
 ### Web Server ###
 
@@ -54,7 +57,7 @@ In `/etc/php-fpm.d/www.conf` make these changes:
 
 ```nginx
 ;listen = 127.0.0.1:9000
-listen = /var/run/php/php7.0-fpm.sock
+listen = /var/run/php-fpm/php7.0-fpm.sock
 
 listen.owner = nginx
 listen.group = nginx
@@ -99,13 +102,15 @@ server {
  index       index.php;
  access_log  /opt/librenms/logs/access_log;
  error_log   /opt/librenms/logs/error_log;
+ gzip on;
+ gzip_types text/css application/x-javascript text/richtext image/svg+xml text/plain    text/xsd text/xsl text/xml image/x-icon;
  location / {
   try_files $uri $uri/ @librenms;
  }
  location ~ \.php {
   include fastcgi.conf;
   fastcgi_split_path_info ^(.+\.php)(/.+)$;
-  fastcgi_pass unix:/var/run/php/php7.0-fpm.sock;
+  fastcgi_pass unix:/var/run/php-fpm/php7.0-fpm.sock;
  }
  location ~ /\.ht {
   deny all;

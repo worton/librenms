@@ -415,6 +415,14 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
         $this->checkOS('ciscosb', 'ciscosb6');
         $this->checkOS('ciscosb', 'ciscosb7');
         $this->checkOS('ciscosb', 'ciscosb8');
+        $this->checkOS('ciscosb', 'ciscosb9');
+        $this->checkOS('ciscosb', 'ciscosb10');
+        $this->checkOS('ciscosb', 'ciscosb11');
+        $this->checkOS('ciscosb', 'ciscosb12');
+        $this->checkOS('ciscosb', 'ciscosb-srw2008');
+        $this->checkOS('ciscosb', 'ciscosb-srw2008p');
+        $this->checkOS('ciscosb', 'ciscosb-srw208');
+        $this->checkOS('ciscosb', 'ciscosb-srw208mp');
     }
 
     public function testCiscosmblinux()
@@ -472,6 +480,11 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
     public function testCyberoamUtm()
     {
         $this->checkOS('cyberoam-utm');
+    }
+
+    public function testCyberpower()
+    {
+        $this->checkOS('cyberpower');
     }
 
     public function testDasanNos()
@@ -534,6 +547,11 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
         $this->checkOS('developprinter');
     }
 
+    public function testDigipower()
+    {
+        $this->checkOS('digipower');
+    }
+
     public function testDlinkap()
     {
         $this->checkOS('dlinkap');
@@ -563,6 +581,8 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
         $this->checkOS('dnos', 'dnos9');
         $this->checkOS('dnos', 'dnos10');
         $this->checkOS('dnos', 'dnos11');
+        $this->checkOS('dnos', 'dnos12');
+        $this->checkOS('dnos', 'dnos13');
     }
 
     public function testDrac()
@@ -666,6 +686,11 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
         $this->checkOS('exinda');
     }
 
+    public function testExtrahop()
+    {
+        $this->checkOS('extrahop');
+    }
+
     public function testExtremeware()
     {
         $this->checkOS('extremeware');
@@ -716,6 +741,11 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
     public function testFortiswitch()
     {
         $this->checkOS('fortiswitch');
+    }
+
+    public function testFortiwlc()
+    {
+        $this->checkOS('fortiwlc');
     }
 
     public function testFoundryos()
@@ -794,6 +824,11 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
         $this->checkOS('hpe-msl');
     }
 
+    public function testHpeMsa()
+    {
+        $this->checkOS('hpe-msa');
+    }
+
     public function testHpmsm()
     {
         $this->checkOS('hpmsm');
@@ -844,6 +879,7 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
         $this->checkOS('ibmnos');
         $this->checkOS('ibmnos', 'ibmnos1');
         $this->checkOS('ibmnos', 'ibmnos-flex');
+        $this->checkOS('ibmnos', 'ibmnos-flex-lenovo-en4093r');
     }
 
     public function testIbmtl()
@@ -966,6 +1002,11 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
         $this->checkOS('lantronix-slc');
     }
 
+    public function testLantronixuds()
+    {
+        $this->checkOS('lantronix-uds');
+    }
+
     public function testLcos()
     {
         $this->checkOS('lcos');
@@ -990,6 +1031,11 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
     public function testLigoos()
     {
         $this->checkOS('ligoos');
+    }
+
+    public function testLinksysSS()
+    {
+        $this->checkOS('linksys-ss', 'linksys-lgs308p');
     }
 
     public function testLinux()
@@ -1285,6 +1331,9 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
     public function testPlanetos()
     {
         $this->checkOS('planetos');
+        $this->checkOS('planetos', 'planetos1');
+        $this->checkOS('planetos', 'planetos-gs-5220-16s8c');
+        $this->checkOS('planetos', 'planetos-sgsw-24240');
     }
 
     public function testPoweralert()
@@ -1305,6 +1354,7 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
         $this->checkOS('powerconnect', 'powerconnect-3011');
         $this->checkOS('powerconnect', 'powerconnect-3019');
         $this->checkOS('powerconnect', 'powerconnect-3031');
+        $this->checkOS('powerconnect', 'powerconnect-3041');
     }
 
     public function testPowervault()
@@ -1598,6 +1648,7 @@ class DiscoveryTest extends \PHPUnit_Framework_TestCase
     {
         $this->checkOS('tplink');
         $this->checkOS('tplink', 'tplink1');
+        $this->checkOS('tplink', 'tplink-t1600g-28ts');
     }
 
     public function testTranzeo()
