@@ -25,6 +25,7 @@ source: Support/FAQ.md
  - [Why is my EdgeRouter device not detected?](#faq25)
  - [Why are some of my disks not showing?](#faq26)
  - [Why are my disks reporting an incorrect size?](#faq27)
+ - [What is the Difference between Disable Device and Ignore a Device?](#faq28)
 
 ### Developing
  - [How do I add support for a new OS?](#faq8)
@@ -250,6 +251,11 @@ There is a known issue for net-snmp, which causes it to report incorrect disk si
 
 `realStorageUnits 0`
 
+#### <a name="faq28"> What is the Difference between Disable Device and Ignore a Device?</a>
+
+  - Disable stops polling.
+  - Ignore disables alerting.
+
 #### <a name="faq8"> How do I add support for a new OS?</a>
 
 Please see [Supporting a new OS](../Developing/Support-New-OS.md)
@@ -257,16 +263,20 @@ Please see [Supporting a new OS](../Developing/Support-New-OS.md)
 #### <a name="faq20"> What information do you need to add a new OS?</a>
 
 Under the device, click the gear and select Capture. 
-Please provide the output of Discovery, Poller, and Snmpwalk as separate non-expiring pastebin.com links.
+Please provide the output of Discovery, Poller, and Snmpwalk as separate non-expiring https://p.libren.ms/ links.
 
 You can also use the command line to obtain the information.  Especially, if snmpwalk results in a large amount of data.
 Replace the relevant information in these commands such as HOSTNAME and COMMUNITY. Use `snmpwalk` instead of `snmpbulkwalk` for v1 devices.
 
+> These commands will automatically upload the data to LibreNMS servers.
+
 ```bash
-./discovery.php -h HOSTNAME -d
-./poller.php -h HOSTNAME -r -f -d
-snmpbulkwalk -OUneb -v2c -c COMMUNITY HOSTNAME .
+./discovery.php -h HOSTNAME -d | ./pbin.sh
+./poller.php -h HOSTNAME -r -f -d | ./pbin.sh
+snmpbulkwalk -OUneb -v2c -c COMMUNITY HOSTNAME .  | ./pbin.sh
 ```
+
+You can use the links provided by these commands within the issue.
 
 If possible please also provide what the OS name should be if it doesn't exist already.
 

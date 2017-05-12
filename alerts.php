@@ -30,21 +30,7 @@ require __DIR__ . '/includes/init.php';
 
 $options = getopt('d::');
 
-$lock = false;
-if (file_exists($config['install_dir'].'/.alerts.lock')) {
-    $pids = explode("\n", trim(`ps -e | grep php | awk '{print $1}'`));
-    $lpid = trim(file_get_contents($config['install_dir'].'/.alerts.lock'));
-    if (in_array($lpid, $pids)) {
-        $lock = true;
-    }
-}
-
-if ($lock === true) {
-    exit(1);
-} else {
-    file_put_contents($config['install_dir'].'/.alerts.lock', getmypid());
-}
-
+set_lock('alerts');
 
 if (isset($options['d'])) {
     echo "DEBUG!\n";
@@ -63,6 +49,8 @@ if (isset($options['d'])) {
 
 if (!defined('TEST') && $config['alert']['disable'] != 'true') {
     echo 'Start: '.date('r')."\r\n";
+    echo "ClearStaleAlerts():" . PHP_EOL;
+    ClearStaleAlerts();
     echo "RunFollowUp():\r\n";
     RunFollowUp();
     echo "RunAlerts():\r\n";
@@ -72,8 +60,18 @@ if (!defined('TEST') && $config['alert']['disable'] != 'true') {
     echo 'End  : '.date('r')."\r\n";
 }
 
-unlink($config['install_dir'].'/.alerts.lock');
+release_lock('alerts');
 
+function ClearStaleAlerts()
+{
+    $sql = "SELECT `alerts`.`id` AS `alert_id`, `devices`.`hostname` AS `hostname` FROM `alerts` LEFT JOIN `devices` ON `alerts`.`device_id`=`devices`.`device_id`  RIGHT JOIN `alert_rules` ON `alerts`.`rule_id`=`alert_rules`.`id` WHERE `alerts`.`state`!=0 AND `devices`.`hostname` IS NULL";
+    foreach (dbFetchRows($sql) as $alert) {
+        if (empty($alert['hostname']) && isset($alert['alert_id'])) {
+            dbDelete('alerts', '`id` = ?', array($alert['alert_id']));
+            echo "Stale-alert: #{$alert['alert_id']}" . PHP_EOL;
+        }
+    }
+}
 
 /**
  * Re-Validate Rule-Mappings

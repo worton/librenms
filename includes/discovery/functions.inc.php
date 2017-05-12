@@ -65,7 +65,7 @@ function discover_new_device($hostname, $device = '', $method = '', $interface =
             device_by_id_cache($remote_device_id, 1);
             if ($remote_device_id && is_array($device) && !empty($method)) {
                 $extra_log = '';
-                $int = ifNameDescr($interface);
+                $int = cleanPort($interface);
                 if (is_array($int)) {
                     $extra_log = ' (port ' . $int['label'] . ') ';
                 }
@@ -79,7 +79,7 @@ function discover_new_device($hostname, $device = '', $method = '', $interface =
         } catch (HostExistsException $e) {
             // already have this device
         } catch (Exception $e) {
-            log_event("$method discovery of " . $hostname . " ($ip) failed - " . $e->getMessage(), null, null, 5);
+            log_event("$method discovery of " . $hostname . " ($ip) failed - " . $e->getMessage(), $device['device_id'], 'discovery', 5);
         }
     } else {
         d_echo("$ip not in a matched network - skipping\n");
@@ -88,7 +88,7 @@ function discover_new_device($hostname, $device = '', $method = '', $interface =
 
 //end discover_new_device()
 
-function discover_device($device, $options = null)
+function discover_device(&$device, $options = null)
 {
     global $config, $valid;
 
@@ -187,7 +187,7 @@ function discover_device($device, $options = null)
 // Discover sensors
 
 
-function discover_sensor(&$valid, $class, $device, $oid, $index, $type, $descr, $divisor = '1', $multiplier = '1', $low_limit = null, $low_warn_limit = null, $warn_limit = null, $high_limit = null, $current = null, $poller_type = 'snmp', $entPhysicalIndex = null, $entPhysicalIndex_measured = null)
+function discover_sensor(&$valid, $class, $device, $oid, $index, $type, $descr, $divisor = 1, $multiplier = 1, $low_limit = null, $low_warn_limit = null, $warn_limit = null, $high_limit = null, $current = null, $poller_type = 'snmp', $entPhysicalIndex = null, $entPhysicalIndex_measured = null)
 {
 
     $low_limit      = set_null($low_limit);
@@ -199,27 +199,27 @@ function discover_sensor(&$valid, $class, $device, $oid, $index, $type, $descr, 
         $divisor  = 1;
     }
 
-    d_echo("Discover sensor: $oid, $index, $type, $descr, $poller_type, $precision, $entPhysicalIndex\n");
+    d_echo("Discover sensor: $oid, $index, $type, $descr, $poller_type, $divisor, $multiplier, $entPhysicalIndex, $current\n");
 
     if (is_null($low_warn_limit) && !is_null($warn_limit)) {
         // Warn limits only make sense when we have both a high and a low limit
         $low_warn_limit = null;
         $warn_limit = null;
-    } elseif ($low_warn_limit > $warn_limit) {
+    } elseif (!is_null($warn_limit) && $low_warn_limit > $warn_limit) {
         // Fix high/low thresholds (i.e. on negative numbers)
         list($warn_limit, $low_warn_limit) = array($low_warn_limit, $warn_limit);
     }
 
     if (dbFetchCell('SELECT COUNT(sensor_id) FROM `sensors` WHERE `poller_type`= ? AND `sensor_class` = ? AND `device_id` = ? AND sensor_type = ? AND `sensor_index` = ?', array($poller_type, $class, $device['device_id'], $type, $index)) == '0') {
-        if (!$high_limit) {
+        if (is_null($high_limit)) {
             $high_limit = sensor_limit($class, $current);
         }
 
-        if (!$low_limit) {
+        if (is_null($low_limit)) {
             $low_limit = sensor_low_limit($class, $current);
         }
 
-        if ($low_limit > $high_limit) {
+        if (!is_null($high_limit) && $low_limit > $high_limit) {
             // Fix high/low thresholds (i.e. on negative numbers)
             list($high_limit, $low_limit) = array($low_limit, $high_limit);
         }
@@ -319,7 +319,13 @@ function discover_sensor(&$valid, $class, $device, $oid, $index, $type, $descr, 
             log_event('Sensor Warn Low Limit Updated: ' . mres($class) . ' ' . mres($type) . ' ' . mres($index) . ' ' . mres($descr) . ' (' . $low_warn_limit . ')', $device, 'sensor', 3, $sensor_id);
         }
 
-        if ($oid == $sensor_entry['sensor_oid'] && $descr == $sensor_entry['sensor_descr'] && $multiplier == $sensor_entry['sensor_multiplier'] && $divisor == $sensor_entry['sensor_divisor'] && $entPhysicalIndex_measured == $sensor_entry['entPhysicalIndex_measured'] && $entPhysicalIndex == $sensor_entry['entPhysicalIndex']) {
+        if ($oid == $sensor_entry['sensor_oid'] &&
+            $descr == $sensor_entry['sensor_descr'] &&
+            $multiplier == $sensor_entry['sensor_multiplier'] &&
+            $divisor == $sensor_entry['sensor_divisor'] &&
+            $entPhysicalIndex_measured == $sensor_entry['entPhysicalIndex_measured'] &&
+            $entPhysicalIndex == $sensor_entry['entPhysicalIndex']
+        ) {
             echo '.';
         } else {
             $update = array(
@@ -359,7 +365,7 @@ function sensor_low_limit($class, $current)
             break;
 
         case 'humidity':
-            $limit = '70';
+            $limit = '30';
             break;
 
         case 'frequency':
@@ -380,6 +386,9 @@ function sensor_low_limit($class, $current)
 
         case 'signal':
             $limit = -80;
+            break;
+        case 'airflow':
+            $limit = ($current * 0.95);
             break;
     }//end switch
 
@@ -431,6 +440,9 @@ function sensor_limit($class, $current)
 
         case 'load':
             $limit = 80;
+            break;
+        case 'airflow':
+            $limit = ($current * 1.05);
             break;
     }//end switch
 
@@ -716,30 +728,39 @@ function discover_process_ipv6(&$valid, $ifIndex, $ipv6_address, $ipv6_prefixlen
     if (dbFetchCell('SELECT COUNT(*) FROM `ports` WHERE device_id = ? AND `ifIndex` = ?', array($device['device_id'], $ifIndex)) != '0' && $ipv6_prefixlen > '0' && $ipv6_prefixlen < '129' && $ipv6_compressed != '::1') {
         $port_id = dbFetchCell('SELECT port_id FROM `ports` WHERE device_id = ? AND ifIndex = ?', array($device['device_id'], $ifIndex));
 
-        if (dbFetchCell('SELECT COUNT(*) FROM `ipv6_networks` WHERE `ipv6_network` = ?', array($ipv6_network)) < '1') {
-            dbInsert(array('ipv6_network' => $ipv6_network, 'context_name' => $context_name), 'ipv6_networks');
-            echo 'N';
-        } else {
-            //Update Context
-            dbUpdate(array('context_name' => $device['context_name']), 'ipv6_networks', '`ipv6_network` = ?', array($ipv6_network));
-            echo 'n';
+        if (is_numeric($port_id)) {
+            if (dbFetchCell('SELECT COUNT(*) FROM `ipv6_networks` WHERE `ipv6_network` = ?', array($ipv6_network)) < '1') {
+                dbInsert(array('ipv6_network' => $ipv6_network, 'context_name' => $context_name), 'ipv6_networks');
+                echo 'N';
+            } else {
+                //Update Context
+                dbUpdate(array('context_name' => $device['context_name']), 'ipv6_networks', '`ipv6_network` = ?', array($ipv6_network));
+                echo 'n';
+            }
+
+            $ipv6_network_id = dbFetchCell('SELECT `ipv6_network_id` FROM `ipv6_networks` WHERE `ipv6_network` = ? AND `context_name` = ?', array($ipv6_network, $context_name));
+
+            if (dbFetchCell('SELECT COUNT(*) FROM `ipv6_addresses` WHERE `ipv6_address` = ? AND `ipv6_prefixlen` = ? AND `port_id` = ?', array($ipv6_address, $ipv6_prefixlen, $port_id)) == '0') {
+                dbInsert(array(
+                    'ipv6_address' => $ipv6_address,
+                    'ipv6_compressed' => $ipv6_compressed,
+                    'ipv6_prefixlen' => $ipv6_prefixlen,
+                    'ipv6_origin' => $ipv6_origin,
+                    'ipv6_network_id' => $ipv6_network_id,
+                    'port_id' => $port_id,
+                    'context_name' => $context_name
+                ), 'ipv6_addresses');
+                echo '+';
+            } else {
+                //Update Context
+                dbUpdate(array('context_name' => $device['context_name']), 'ipv6_addresses', '`ipv6_address` = ? AND `ipv6_prefixlen` = ? AND `port_id` = ?', array($ipv6_address, $ipv6_prefixlen, $port_id));
+                echo '.';
+            }
+
+            $full_address = "$ipv6_address/$ipv6_prefixlen";
+            $valid_address = $full_address . '-' . $port_id;
+            $valid['ipv6'][$valid_address] = 1;
         }
-
-
-        $ipv6_network_id = dbFetchCell('SELECT `ipv6_network_id` FROM `ipv6_networks` WHERE `ipv6_network` = ? AND `context_name` = ?', array($ipv6_network, $context_name));
-
-        if (dbFetchCell('SELECT COUNT(*) FROM `ipv6_addresses` WHERE `ipv6_address` = ? AND `ipv6_prefixlen` = ? AND `port_id` = ?', array($ipv6_address, $ipv6_prefixlen, $port_id)) == '0') {
-            dbInsert(array('ipv6_address' => $ipv6_address, 'ipv6_compressed' => $ipv6_compressed, 'ipv6_prefixlen' => $ipv6_prefixlen, 'ipv6_origin' => $ipv6_origin, 'ipv6_network_id' => $ipv6_network_id, 'port_id' => $port_id, 'context_name' => $context_name), 'ipv6_addresses');
-            echo '+';
-        } else {
-            //Update Context
-            dbUpdate(array('context_name' => $device['context_name']), 'ipv6_addresses', '`ipv6_address` = ? AND `ipv6_prefixlen` = ? AND `port_id` = ?', array($ipv6_address, $ipv6_prefixlen, $port_id));
-            echo '.';
-        }
-
-        $full_address = "$ipv6_address/$ipv6_prefixlen";
-        $valid_address = $full_address . '-' . $port_id;
-        $valid['ipv6'][$valid_address] = 1;
     }//end if
 }//end discover_process_ipv6()
 
@@ -891,40 +912,66 @@ function avtech_add_sensor($device, $sensor)
     return true;
 }
 
+
 /**
- * @param $device
- * @param $serial
- * @param $sensor
+ * Get the device divisor, account for device specific quirks
+ * The default divisor is 10
+ *
+ * @param array $device device array
+ * @param string $os_version firmware version poweralert quirks
+ * @param string $sensor_type the type of this sensor
+ * @param string $oid the OID of this sensor
  * @return int
  */
-function get_device_divisor($device, $serial, $sensor)
+function get_device_divisor($device, $os_version, $sensor_type, $oid)
 {
     if ($device['os'] == 'poweralert') {
-        if ($sensor == 'current' || $sensor == 'frequencies') {
-            if (version_compare($serial, '12.06.0068', '>=')) {
-                $divisor = 10;
-            } elseif (version_compare($serial, '12.04.0055', '=')) {
-                $divisor = 10;
-            } elseif (version_compare($serial, '12.04.0056', '>=')) {
-                $divisor = 1;
+        if ($sensor_type == 'current' || $sensor_type == 'frequency') {
+            if (version_compare($os_version, '12.06.0068', '>=')) {
+                return 10;
+            } elseif (version_compare($os_version, '12.04.0055', '=')) {
+                return 10;
+            } elseif (version_compare($os_version, '12.04.0056', '>=')) {
+                return 1;
             }
-        } elseif ($sensor == 'load') {
-            if (version_compare($serial, '12.06.0064', '=')) {
-                $divisor = 10;
+        } elseif ($sensor_type == 'load') {
+            if (version_compare($os_version, '12.06.0064', '=')) {
+                return 10;
             } else {
-                $divisor = 1;
+                return 1;
             }
-        } elseif ($sensor == 'voltages') {
-            $divisor = 1;
+        } elseif ($sensor_type == 'voltage') {
+            return 1;
         }
-    } elseif (($device['os'] == 'huaweiups') && ($sensor == 'frequencies')) {
-        $divisor = 100;
-    } elseif (($device['os'] == 'netmanplus') && ($sensor == 'voltages')) {
-        $divisor = 1;
-    } else {
-        $divisor = 10;
+    } elseif (($device['os'] == 'huaweiups') && ($sensor_type == 'frequency')) {
+        return 100;
+    } elseif (($device['os'] == 'netmanplus') && ($sensor_type == 'voltage')) {
+        return 1;
+    } elseif ($device['os'] == 'generex-ups') {
+        if ($sensor_type == 'load') {
+            return 1;
+        } elseif ($sensor_type == 'voltage' && !starts_with($oid, '.1.3.6.1.2.1.33.1.2.5.')) {
+            return 1;
+        }
+    } elseif ($device['os'] == 'apc-mgeups') {
+        if ($sensor_type == 'load') {
+            return 1;
+        } elseif ($sensor_type == 'voltage' && !starts_with($oid, '.1.3.6.1.2.1.33.1.2.5.')) {
+            return 1;
+        }
+    } elseif ($device['os'] == 'ge-ups') {
+        if ($sensor_type == 'load') {
+            return 1;
+        } elseif ($sensor_type == 'voltage' && !starts_with($oid, '.1.3.6.1.2.1.33.1.2.5.')) {
+            return 1;
+        }
+    } elseif ($device['os'] == 'eaton-mgeups') {
+        if ($sensor_type == 'load') {
+            return 1;
+        }
     }
-    return $divisor;
+
+    return 10; //default
 }
 
 /**
@@ -990,7 +1037,7 @@ function sensors($types, $device, $valid, $pre_cache = array())
         if (is_file($dir . $device['os'] . '.inc.php')) {
             include $dir . $device['os'] . '.inc.php';
         }
-        if (isset($config['modules_compat']['rfc1628'][$device['os']]) && $config['modules_compat']['rfc1628'][$device['os']]) {
+        if (isset($config['os'][$device['os']]['rfc1628_compat']) && $config['os'][$device['os']]['rfc1628_compat']) {
             if (is_file($dir  . '/rfc1628.inc.php')) {
                 include $dir . '/rfc1628.inc.php';
             }
@@ -998,5 +1045,146 @@ function sensors($types, $device, $valid, $pre_cache = array())
         d_echo($valid['sensor'][$sensor_type]);
         check_valid_sensors($device, $sensor_type, $valid['sensor']);
         echo "\n";
+    }
+}
+
+function build_bgp_peers($device, $data, $peer2)
+{
+    d_echo("Peers : $data\n");
+    $peers = trim(str_replace('ARISTA-BGP4V2-MIB::aristaBgp4V2PeerRemoteAs.1.', '', $data));
+    $peers = trim(str_replace('CISCO-BGP4-MIB::cbgpPeer2RemoteAs.', '', $peers));
+    $peers = trim(str_replace('BGP4-MIB::bgpPeerRemoteAs.', '', $peers));
+    $peers  = trim(str_replace('.1.3.6.1.4.1.2636.5.1.1.2.1.1.1.13.', '', $peers));
+    $peerlist = array();
+    $ver = '';
+    foreach (explode("\n", $peers) as $peer) {
+        if ($peer2 === true) {
+            list($ver, $peer) = explode('.', $peer, 2);
+        }
+        list($peer_ip, $peer_as) = explode(' ', $peer);
+        if ($device['os'] === 'junos') {
+            $ver = '';
+            $octets = count(explode(".", $peer_ip));
+            if ($octets > 11) {
+                // ipv6
+                $peer_ip = Net_IPv6::compress(snmp2ipv6(implode('.', array_slice(explode('.', $peer_ip), (count(explode('.', $peer_ip)) - 16)))));
+            } else {
+                // ipv4
+                $peer_ip = implode('.', array_slice(explode('.', $peer_ip), (count(explode('.', $peer_ip)) - 4)));
+            }
+        } else {
+            if (strstr($peer_ip, ':')) {
+                $peer_ip_snmp = preg_replace('/:/', ' ', $peer_ip);
+                $peer_ip = preg_replace('/(\S+\s+\S+)\s/', '$1:', $peer_ip_snmp);
+                $peer_ip = str_replace('"', '', str_replace(' ', '', $peer_ip));
+            }
+        }
+        if ($peer && $peer_ip != '0.0.0.0') {
+            d_echo("Found peer $peer_ip (AS$peer_as)\n");
+            $peerlist[] = array(
+                'ip'  => $peer_ip,
+                'as'  => $peer_as,
+                'ver' => $ver,
+            );
+        }
+    }
+    return $peerlist;
+}
+
+function build_cbgp_peers($device, $peer, $af_data, $peer2)
+{
+
+    d_echo('afi data :: ');
+    d_echo($af_data);
+
+    $af_list = array();
+    foreach ($af_data as $k => $v) {
+        if ($peer2 === true) {
+            list(,$k) = explode('.', $k, 2);
+        }
+
+        d_echo("AFISAFI = $k\n");
+
+        $afisafi_tmp = explode('.', $k);
+        $safi        = array_pop($afisafi_tmp);
+        $afi         = array_pop($afisafi_tmp);
+        $bgp_ip      = str_replace(".$afi.$safi", '', $k);
+        if ($device['os_group'] === 'arista') {
+            $bgp_ip      = str_replace("$afi.", '', $bgp_ip);
+        }
+        $bgp_ip      = preg_replace('/:/', ' ', $bgp_ip);
+        $bgp_ip      = preg_replace('/(\S+\s+\S+)\s/', '$1:', $bgp_ip);
+        $bgp_ip      = str_replace('"', '', str_replace(' ', '', $bgp_ip));
+
+        if ($afi && $safi && $bgp_ip == $peer['ip']) {
+            $af_list[$bgp_ip][$afi][$safi] = 1;
+            add_cbgp_peer($device, $peer, $afi, $safi);
+        }
+    }
+    return $af_list;
+}
+
+function add_bgp_peer($device, $peer)
+{
+    global $config;
+    if (dbFetchCell('SELECT COUNT(*) from `bgpPeers` WHERE device_id = ? AND bgpPeerIdentifier = ?', array($device['device_id'], $peer['ip'])) < '1') {
+        $bgpPeers = array(
+            'device_id' => $device['device_id'],
+            'bgpPeerIdentifier' => $peer['ip'],
+            'bgpPeerRemoteAs' => $peer['as'],
+            'context_name' => $device['context_name'],
+            'astext' => $peer['astext'],
+            'bgpPeerState' => 'idle',
+            'bgpPeerAdminStatus' => 'stop',
+            'bgpLocalAddr' => '0.0.0.0',
+            'bgpPeerRemoteAddr' => '0.0.0.0',
+            'bgpPeerInUpdates' => 0,
+            'bgpPeerOutUpdates' => 0,
+            'bgpPeerInTotalMessages' => 0,
+            'bgpPeerOutTotalMessages' => 0,
+            'bgpPeerFsmEstablishedTime' => 0,
+            'bgpPeerInUpdateElapsedTime' => 0,
+        );
+        dbInsert($bgpPeers, 'bgpPeers');
+        if ($config['autodiscovery']['bgp'] === true) {
+            $name             = gethostbyaddr($peer['ip']);
+            discover_new_device($name, $device, 'BGP');
+        }
+        echo '+';
+    } else {
+        dbUpdate(array('bgpPeerRemoteAs' => $peer['as'], 'astext' => mres($peer['astext'])), 'bgpPeers', 'device_id=? AND bgpPeerIdentifier=?', array($device['device_id'], $peer['ip']));
+        echo '.';
+    }
+}
+
+function add_cbgp_peer($device, $peer, $afi, $safi)
+{
+    if (dbFetchCell('SELECT COUNT(*) from `bgpPeers_cbgp` WHERE device_id = ? AND bgpPeerIdentifier = ? AND afi=? AND safi=?', array($device['device_id'], $peer['ip'], $afi, $safi)) == 0) {
+        $cbgp = array(
+            'device_id' => $device['device_id'],
+            'bgpPeerIdentifier' => $peer['ip'],
+            'afi' => $afi,
+            'safi' => $safi,
+            'context_name' => $device['context_name'],
+            'AcceptedPrefixes' => 0,
+            'DeniedPrefixes' => 0,
+            'PrefixAdminLimit' => 0,
+            'PrefixThreshold' => 0,
+            'PrefixClearThreshold' => 0,
+            'AdvertisedPrefixes' => 0,
+            'SuppressedPrefixes' => 0,
+            'WithdrawnPrefixes' => 0,
+            'AcceptedPrefixes_delta' => 0,
+            'AcceptedPrefixes_prev' => 0,
+            'DeniedPrefixes_delta' => 0,
+            'DeniedPrefixes_prev' => 0,
+            'AdvertisedPrefixes_delta' => 0,
+            'AdvertisedPrefixes_prev' => 0,
+            'SuppressedPrefixes_delta' => 0,
+            'SuppressedPrefixes_prev' => 0,
+            'WithdrawnPrefixes_delta' => 0,
+            'WithdrawnPrefixes_prev' => 0,
+        );
+        dbInsert($cbgp, 'bgpPeers_cbgp');
     }
 }

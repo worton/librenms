@@ -57,7 +57,7 @@ $msg_box = array();
 // Check for install.inc.php
 if (!file_exists('../config.php') && $_SERVER['PATH_INFO'] != '/install.php') {
     // no config.php does so let's redirect to the install
-    header('Location: install.php');
+    header("Location: {$config['base_url']}/install.php");
     exit;
 }
 
@@ -139,7 +139,7 @@ if (empty($config['favicon'])) {
   <link href="css/MarkerCluster.css" rel="stylesheet" type="text/css" />
   <link href="css/MarkerCluster.Default.css" rel="stylesheet" type="text/css" />
   <link href="css/leaflet.awesome-markers.css" rel="stylesheet" type="text/css" />
-  <link href="<?php echo($config['stylesheet']);  ?>?ver=291727419" rel="stylesheet" type="text/css" />
+  <link href="<?php echo($config['stylesheet']);  ?>?ver=291727421" rel="stylesheet" type="text/css" />
   <link href="css/<?php echo $config['site_style']; ?>.css?ver=632417639" rel="stylesheet" type="text/css" />
 <?php
 
